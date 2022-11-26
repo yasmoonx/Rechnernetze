@@ -55,6 +55,27 @@ class Ev:
 
 class EvQueue:
 # please implement here
+    def __init__(self) :
+        self.q = []
+        self.time = 0
+        self.evCount = 0
+
+    def pop(self):
+        return heapq.heappop(self.q)
+        
+    def push(self,event):
+        heapq.heappush(self.q,event)
+    
+    def start(self):
+        while len(self.q) > 0:
+            event = self.pop()
+            # ereignisfunktion aufrufen 
+            event.work #?
+            
+
+
+    
+
     
 
 
@@ -66,7 +87,11 @@ class EvQueue:
 # delay_per_item: service time
 # CustomerWaiting, busy: possible states of this station
 class Station():
+    
+
+      
 # please implement here
+
 
 
 # class consists of
