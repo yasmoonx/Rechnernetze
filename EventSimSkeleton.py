@@ -55,10 +55,13 @@ class Ev:
 
 class EvQueue:
 # please implement here
+
+    time = 0
+    evCount = 0
+    
     def __init__(self) :
         self.q = []
-        self.time = 0
-        self.evCount = 0
+        
 
     def pop(self):
         return heapq.heappop(self.q)
