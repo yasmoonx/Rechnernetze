@@ -87,9 +87,18 @@ class EvQueue:
 # delay_per_item: service time
 # CustomerWaiting, busy: possible states of this station
 class Station():
-    
+    def __init__(self,delay_per_item,name) :
+        self.delay_per_item = delay_per_item
+        self.name = name
+        self.buffer = []
+        self.busy = False
 
-      
+    def queue(self,customer):
+        
+
+
+
+        
 # please implement here
 
 
