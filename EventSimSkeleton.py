@@ -58,7 +58,7 @@ class EvQueue:
 
     time = 0
     evCount = 0
-    
+
     def __init__(self) :
         self.q = []
         
@@ -77,19 +77,13 @@ class EvQueue:
             
 
 
-    
-
-    
-
-
-
-
 # class consists of
 # name: station name
 # buffer: customer queue
 # delay_per_item: service time
 # CustomerWaiting, busy: possible states of this station
 class Station():
+    # please implement here
     def __init__(self,delay_per_item,name) :
         self.delay_per_item = delay_per_item
         self.name = name
@@ -97,12 +91,15 @@ class Station():
         self.busy = False
 
     def queue(self,customer):
-        
+        self.buffer.append(customer)
+        self.busy = True
 
+    def leave(self,customer):
+        self.buffer.remove(customer)
+        if len(self.buffer)==0:
+            self.busy= False
+             
 
-
-        
-# please implement here
 
 
 
@@ -117,6 +114,21 @@ class Customer():
     duration_cond_complete = 0
     count = 0
 # please implement here
+
+    def __init__(self, list,name,t) :
+        self.list = list
+        self.name = name
+        self.t = t
+
+    #def run()/begin():
+
+    #def arrive():
+
+    #def leave():
+        
+
+
+        
 
 
 
