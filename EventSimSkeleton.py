@@ -6,6 +6,7 @@ fc = open("supermarkt_customer.txt", "w")
 fs = open("supermarkt_station.txt", "w")
 
 
+
 # print on console and into supermarket log
 def my_print(msg):
     print(msg)
@@ -46,6 +47,17 @@ class Ev:
         self.prio = prio
         Ev.counter += 1
 
+    #fixes error: 'lesser than' not supported for Ev
+    def __lt__(self, other):
+        if(self.t==other.t):
+            if(self.prio==other.prio):
+                return self.n < other.n
+            else:
+                return self.prio > other.prio
+        else:
+            return self.t < other.t 
+
+
 
 # class consists of
 # q: event queue
@@ -61,19 +73,24 @@ class EvQueue:
 
     def __init__(self) :
         self.q = []
-        
-
+    
     def pop(self):
-        return heapq.heappop(self.q)
+        event = heapq.heappop(self.q)
+        #update time
+        EvQueue.time = event.t  
+        #call ereignisfunktion with args
+        event.work(event.args)
+        return event
         
     def push(self,event):
         heapq.heappush(self.q,event)
+        EvQueue.evCount+=1
     
     def start(self):
+        #pop events till EvQueue is empty
         while len(self.q) > 0:
-            event = self.pop()
-            # ereignisfunktion aufrufen 
-            event.work #?
+           self.pop()
+            
             
 
 
@@ -91,13 +108,25 @@ class Station():
         self.busy = False
 
     def queue(self,customer):
+        #customer stands in queue
         self.buffer.append(customer)
-        self.busy = True
 
-    def leave(self,customer):
-        self.buffer.remove(customer)
-        if len(self.buffer)==0:
-            self.busy= False
+        if self.busy == False: #if station not busy
+            self.busy = True
+            T,station,N,W = customer.list[0]
+            ev = Ev(EvQueue.time + (N*self.delay_per_item), work=self.done,args=customer,prio=2)
+            evQ.push(ev)
+            my_print2(self.name,'serves',customer.name)
+
+
+    def done(self,customer):
+        Customer.served[self.name]+=1 #customer was served at station
+        #customer leaves station
+        my_print1(customer.name,self.name,'leaves')
+        self.busy= False
+        ev = Ev(EvQueue.time, work=customer.leave_station,prio=2)
+        evQ.push(ev)
+        
              
 
 
@@ -114,24 +143,61 @@ class Customer():
     duration_cond_complete = 0
     count = 0
 # please implement here
-
-    def __init__(self, list,name,t) :
-        self.list = list
+    #list1 = shopping list, t = arrival time
+    def __init__(self, list1,name,t) :
+        self.list = list(list1)
         self.name = name
         self.t = t
+        Customer.count += 1
 
-    #def run()/begin():
+    #begin shopping
+    def run(self,args):
+        if len(self.list)> 0:
+            # T= Zeit bis naechste station,, N = anzahl einkaeufe, W = maximale warteschlange
+            T,station,N,W = self.list[0]
+            ev = Ev(self.t+T,work=self.arrive_station,prio=3)
+            evQ.push(ev)
+            my_print1(self.name,'Supermarkt','begins')
 
-    #def arrive():
+    #arrive at station
+    def arrive_station(self,args):
+        # T= Zeit bis naechste station,, N = anzahl einkaeufe, W = maximale warteschlange
+        T,station,N,W = self.list[0]
+        my_print1(self.name,station.name,'arrives')
+        Customer.duration += station.delay_per_item * N
+        #check for enough space in queue
+        if len(station.buffer)+1 <= W:
+            Customer.duration_cond_complete+= station.delay_per_item *N
+            ev = Ev(EvQueue.time,work=station.queue, args=self,prio=1)
+            evQ.push(ev)
+        #not enough space in queue
+        else:
+            Customer.dropped[station.name]+= 1 #customer left station without buying stuff
+            my_print1(self.name,station.name,'dropped')
 
-    #def leave():
+
+
+    def leave_station(self,args):
+        #delete entry in einkaufsliste
+        self.list.pop(0)
+        if len(self.list)>0: #keep shopping?
+            # T= Zeit bis naechste station,, N = anzahl einkaeufe, W = maximale warteschlange
+            T,station,N,W = self.list[0]
+            #start event at next station
+            ev = Ev(EvQueue.time+T,work=self.arrive_station,prio=3)
+            evQ.push(ev)
+        else:
+            Customer.complete += 1
+            my_print1(self.name,'Supermarkt','leaves')
+        
+        
         
 
 
         
 
 
-
+#st = startTime, mT= maxTime, dT= time till new customer
 def startCustomers(einkaufsliste, name, sT, dT, mT):
     i = 1
     t = sT
@@ -141,6 +207,7 @@ def startCustomers(einkaufsliste, name, sT, dT, mT):
         evQ.push(ev)
         i += 1
         t += dT
+    
 
 
 evQ = EvQueue()
