@@ -39,6 +39,9 @@ class realtime:
             stationen_running.append(t)
             t.start()
 
+        kT = threading.Thread(target=k.is_yielding(), args=(""))
+        kT.start()
+
 
 class Thread:
     myVar = "text"
@@ -106,8 +109,6 @@ class KundIn(Thread):
         """ self.walkList = [] """
         self.Stationen = Stationen
         self.myEvent = threading.Event
-        self.myThread = threading.Thread(
-            target=self.is_yielding, args=[self.myEvent, self.Stationen, self.kd_id])
 
         """
         if typ == 0:
@@ -121,23 +122,24 @@ class KundIn(Thread):
         logging.info(
             "Created Customer of Type %d with ID: %d determined to walk: %s", typ, kd_id, self.walkList) """
 
-        """ self.Stationen[0][2].loginToList(kd_id, self.myEvent).set() """
-        self.Stationen[0][2].loginToList(kd_id, self.myEvent)
+        self.Stationen[0][2].loginToList(kd_id, self.myEvent).set()
+        """ self.Stationen[0][2].loginToList(kd_id, self.myEvent) """
         """ wartende Station wird aktiviert """
         """ self.walkList.pop(0)[1].set() """
 
-        self.myThread.start()
+        """ self.myThread.start() """
         """ nn = self.Stationen[0][2].activateStation
         nn() """
 
-    def is_yielding(myEvent, Stationen, kd_id):
-        while not myEvent.is_set():
+    def is_yielding(self):
+        logging.info("started")
+        while not self.myEvent.is_set():
             notAwake = 1
-        logging.info("received SET Event at %s", kd_id)
+        logging.info("received SET Event at %s", self.kd_id)
 
-        nextStation = Stationen.pop(0)
+        nextStation = self.Stationen.pop(0)
         logging.info(
-            "Consumer %s received the package and walks on to %s", kd_id, nextStation[0])
+            "Consumer %s received the package and walks on to %s", self.kd_id, nextStation[0])
 
         nextStation[1].set()
 
