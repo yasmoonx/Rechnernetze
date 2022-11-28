@@ -80,22 +80,23 @@ class realtime:
             s[2] = Station(s)
             """ 0 = name; 1 = waitTime; 2 = Klassenreferenz """
 
-        k = KundIn(0, 0, Stationen)
         """ create Kunde with walklist 1 (Typ1) """
 
         for s in Stationen:
-            t = threading.Thread(target=s[2].is_yielding())
+            t = threading.Thread(target=s[2].is_yielding)
             stationen_running.append(t)
             t.start()
 
-        kT = threading.Thread(target=k.is_yielding(), args=(""))
+        k = KundIn(0, 1, Stationen)
+
+        kT = threading.Thread(target=k.is_yielding, args=(""))
         kT.start()
 
-        STARTTIME = time.perf_counter()
+        """ STARTTIME = time.perf_counter()
         logging.info("Starttime: %d", STARTTIME)
         CREATIONENDTIME += STARTTIME
         creator = threading.Thread(target=realtime.generateCustomer, args=(""))
-        creator.start()
+        creator.start() """
 
 
 class Thread:
@@ -124,18 +125,22 @@ class Station(Thread):
 
     """ aufgehaltene Hand ist servEv """
 
-    def subscribe(self, kd_id, aufgehalteneHand):
+    def subscribe(self, kd_id, items, aufgehalteneHand):
+        logging.info("Kunde %d mit %d items stellt sich an bei %s",
+                     kd_id, items, self.name)
         warteListeLock.acquire()
-        self.warteListe.append([kd_id, aufgehalteneHand])
+        self.warteListe.append({kd_id: [items, aufgehalteneHand]})
         """ {kd_id: aufgehaltene Hand} for dict """
         self.interested += 1
         warteListeLock.release()
         return self.myEvent
 
-    def unSubscribe(self, kd_id, kundenEvent):
+    def unSubscribe(self, kd_id):
+        logging.info("Kunde %d ist sauer und lässt %s aus",
+                     kd_id, self.name)
         warteListeLock.acquire()
         self.dropped += 1
-        self.warteListe.remove([kd_id, kundenEvent])
+        self.warteListe.remove(kd_id)
         warteListeLock.release()
     """ We could count in here the Skips to but would have to make sure unsubscribe is only called when too long waited """
 
@@ -150,31 +155,35 @@ class Station(Thread):
         """ while not self.myEvent.is_set():
             notAwake = 1 """
 
+        logging.info("'%s' is waiting for customers", self.name)
         self.myEvent.wait()
         logging.info("received SET Event at %s", self.name)
 
         warteListeLock.acquire()
         currentKD = self.warteListe.pop(0)
+        currentKDItems = 0
+        currentKDEvent = 0
         warteListeLock.release()
-        logging.info("servingCustomer(at %s): '%d'",
-                     self.name, currentKD[0])
-        time.sleep(self.waitTime)
+        logging.info("weird object %s", currentKD)
+        logging.info("servingCustomer(at %s): '%s'",
+                     self.name, currentKD)
+        time.sleep(self.waitTime * currentKDItems)
         logging.info("servedCustomer(at %s): '%d'",
-                     self.name, currentKD[0])
+                     self.name, currentKD)
 
-        """ currentKD[1].set() """
+        """ currentKD[2].set() """
 
         if len(self.warteListe) != 0:
             self.is_yielding()
         else:
             """ self.myEvent.isSet = False """
             self.myEvent.clear()
-            logging.info("(w) - %s is waiting for customers",
+            logging.info("(just served) - %s will be waiting for customers",
                          self.name)
             self.is_yielding()
 
     def __init__(self, name):
-        logging.info("newStation: '%s' is waiting for customers", name[0])
+        logging.info("newStation: %s", name[0])
         self.name = name[0]
         self.waitTime = name[1]
         self.dropped = 0
@@ -199,10 +208,22 @@ class KundIn(Thread):
 
         if typ != 0:
             self.Stationen.pop(0)
-            self.Stationen.pop(5)
+            self.Stationen.pop(4)
 
         """ full """
+        """ ["Wurst", 30 * TIMETRIMFACTOR, 0],
+             ["Käse", 60 * TIMETRIMFACTOR, 0],
+             ["Kasse", 5 * TIMETRIMFACTOR, 0],
+             ["Bäcker", 10 * TIMETRIMFACTOR, 0], """
         if typ == 1:
+            baecker = self.Stationen.pop(3)
+            baecker[1] = 10
+            self.Stationen.insert(0, baecker)
+
+            self.Stationen[1][1] = 5
+            self.Stationen[2][1] = 3
+            self.Stationen[3][1] = 30
+
             """ maximale WaitTime, Time to next Station """
             self.waitingTimes.append([10, 10])  # Bäcker
             self.waitingTimes.append([10, 30])  # Wurst
@@ -210,7 +231,12 @@ class KundIn(Thread):
             self.waitingTimes.append([20, 60])  # Kasse
         """ leberkäs """
         if typ == 2:
-            self.Stationen.pop(1)
+            self.Stationen.pop(1)  # remove Käse
+
+            self.Stationen[0][1] = 2
+            self.Stationen[1][1] = 3
+            self.Stationen[2][1] = 3
+
             self.waitingTimes.append([5, 30])  # Wurst
             self.waitingTimes.append([20, 30])  # Kasse
             self.waitingTimes.append([20, 20])  # Bäcker
@@ -218,15 +244,21 @@ class KundIn(Thread):
         self.myEvent = threading.Event
 
         self.startedAt = time.perf_counter
-        self.Stationen[0][2].subscribe(kd_id, self.myEvent).set()
+
+        logging.info(
+            "Kunde %d betritt den Laden und läuft zu erster Station", kd_id)
+        time.sleep(self.waitingTimes[0][0]*TIMETRIMFACTOR)
+
+        self.Stationen[0][2].subscribe(
+            kd_id, self.Stationen[0][1], self.myEvent).set()
         """ wartende Station wird aktiviert """
 
-        """ self.myThread.start() """
         """ nn = self.Stationen[0][2].activateStation
         nn() """
 
     def is_yielding(self):
-        logging.info("Kundenthread started")
+        logging.info(
+            "Kundenthread zu %d started and waits to receive package", self.kd_id)
         """ while not self.myEvent.is_set():
             notAwake = 1 """
         """ Better not Waiting but checking whether to leave the current location """
@@ -236,7 +268,7 @@ class KundIn(Thread):
             self.Stationen.pop(0) """
 
         self.myEvent.wait()
-        logging.info("received SET Event at %s", self.kd_id)
+        logging.info("received SET Event at Kunde %s", self.kd_id)
 
         logging.info("Consumer %s received the package", self.kd_id)
         self.Stationen.removeAt(0)
@@ -260,7 +292,7 @@ class KundIn(Thread):
             "Consumer %s arrived to and waits at %s [WAITLIST: %d]", self.kd_id, nextStation[0], 0)
         """ enter or return len """
 
-        nextStation[2].subscribe(self.kd_id, self.myEvent).set()
+        """ nextStation[2].subscribe(self.kd_id, self.myEvent).set() """
 
 
 realtime.main()
