@@ -28,6 +28,7 @@ class realtime:
         for s in Stationen:
             """ logging.info(s) """
             s[2] = Station(s)
+            """ 0 = name; 1 = waitTime; 2 = Klassenreferenz """
 
         k = KundIn(0, 0, Stationen)
         """ create Kunde with walklist 1 (Typ1) """
@@ -47,18 +48,21 @@ class Thread:
 
 
 class Station(Thread):
-    """ Die Station-Threads werden zu Beginn der 
+    """ Die Station-Threads werden zu Beginn der
         Simulation gestartet und warten, bis Sie von einem KundIn-Thread aufgeweckt werden. """
 
-    def newKunde(self, kd_id):
-        self.warteListe.append(kd_id)
+    def activateStation(self):
+        return self.myEvent
+
+    def loginToList(self, kd_id, aufgehalteneHand):
+        self.warteListe.append([kd_id, aufgehalteneHand])
         return self.myEvent
 
     """ Die Zeit für die Bedienung einer KundIn wird simuliert,
     in dem sich der Station-Thread für die Bediendauer schlafen legt. (done)
     Das wird über die sleep-Funktion aus dem Modul time realisiert.
     Danach wird die bediente KundIn aufgeweckt. (WANN WURDE DIE ÜBERHAUPT EINGESCHLÄFERT?)
-    Wenn keine weiteren KundInnen in der Warteschlange sind, wartet die Station auf die 
+    Wenn keine weiteren KundInnen in der Warteschlange sind, wartet die Station auf die
     Ankunft des nächsten Kunden """
 
     def is_yielding(self):
@@ -68,10 +72,12 @@ class Station(Thread):
 
         currentKD = self.warteListe.pop(0)
         logging.info("servingCustomer(at %s): '%d'",
-                     self.name, currentKD)
+                     self.name, currentKD[0])
         time.sleep(self.waitTime)
         logging.info("servedCustomer(at %s): '%d'",
-                     self.name, currentKD)
+                     self.name, currentKD[0])
+
+        """ currentKD[1].set() """
 
         if len(self.warteListe) != 0:
             self.is_yielding()
@@ -97,21 +103,43 @@ class KundIn(Thread):
 
     def __init__(self, kd_id, typ, Stationen):
         self.kd_id = 0
-        self.myThread = threading.Thread(target=self)
-        self.walkList = []
+        """ self.walkList = [] """
+        self.Stationen = Stationen
+        self.myEvent = threading.Event
+        self.myThread = threading.Thread(
+            target=self.is_yielding, args=[self.myEvent, self.Stationen, self.kd_id])
 
+        """
         if typ == 0:
+            self.Stationen.pop(0)
+
             for s in Stationen:
-                self.walkList.append(s[2].newKunde(kd_id))
+                self.walkList.append(
+                    [s[0], s[2].newKunde(kd_id, self.myEvent)])
         if typ == 1:
             self.walkList.append(s[0][2].newKunde(kd_id))
         logging.info(
-            "Created Customer of Type %d with ID: %d determined to walk: %s", typ, kd_id, self.walkList)
+            "Created Customer of Type %d with ID: %d determined to walk: %s", typ, kd_id, self.walkList) """
 
-        self.walkList.pop(0).set()
+        """ self.Stationen[0][2].loginToList(kd_id, self.myEvent).set() """
+        self.Stationen[0][2].loginToList(kd_id, self.myEvent)
+        """ wartende Station wird aktiviert """
+        """ self.walkList.pop(0)[1].set() """
 
-    def doSmth(self):
-        logging.info("did something")
+        self.myThread.start()
+        """ nn = self.Stationen[0][2].activateStation
+        nn() """
+
+    def is_yielding(myEvent, Stationen, kd_id):
+        while not myEvent.is_set():
+            notAwake = 1
+        logging.info("received SET Event at %s", kd_id)
+
+        nextStation = Stationen.pop(0)
+        logging.info(
+            "Consumer %s received the package and walks on to %s", kd_id, nextStation[0])
+
+        nextStation[1].set()
 
 
 realtime.main()
