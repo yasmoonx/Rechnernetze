@@ -57,7 +57,7 @@ class realtime:
             logging.info("%s dropped %d percent", s[0], s[2].getDropRate())
 
     def generateCustomer(self):
-        newK = KundIn(kundenAnzahl, random.choice([0, 1]), Stationen)
+        newK = KundIn(kundenAnzahl, random.choice([1, 2]), Stationen)
         runK = threading.Thread(target=newK.is_yielding)
         kunden_running.append(kundenAnzahl)
         """ kunden_running.append([newK, runK]) """
@@ -87,9 +87,10 @@ class realtime:
             stationen_running.append(t)
             t.start()
 
-        k = KundIn(0, 1, Stationen)
+        k = KundIn(0, 2, Stationen)
+        kunden_running.append(0)
 
-        kT = threading.Thread(target=k.is_yielding, args=(""))
+        kT = threading.Thread(target=k.is_yielding)
         kT.start()
 
         """ STARTTIME = time.perf_counter()
@@ -161,25 +162,26 @@ class Station(Thread):
 
         warteListeLock.acquire()
         currentKD = self.warteListe.pop(0)
-        currentKDItems = 0
-        currentKDEvent = 0
         warteListeLock.release()
-        logging.info("weird object %s", currentKD)
-        logging.info("servingCustomer(at %s): '%s'",
-                     self.name, currentKD)
+        kd_name = list(currentKD.keys())[0]
+        currentKD = list(currentKD.values())[0]
+        currentKDItems = currentKD[0]
+        currentKDEvent = currentKD[1]
+        logging.info("servingCustomer(at %s): '%d'",
+                     self.name, kd_name)
         time.sleep(self.waitTime * currentKDItems)
         logging.info("servedCustomer(at %s): '%d'",
-                     self.name, currentKD)
+                     self.name, kd_name)
 
-        """ currentKD[2].set() """
+        currentKDEvent.set()
 
         if len(self.warteListe) != 0:
             self.is_yielding()
         else:
             """ self.myEvent.isSet = False """
             self.myEvent.clear()
-            logging.info("(just served) - %s will be waiting for customers",
-                         self.name)
+            """ logging.info("(just served) - %s will be waiting for customers",
+                         self.name) """
             self.is_yielding()
 
     def __init__(self, name):
@@ -241,7 +243,7 @@ class KundIn(Thread):
             self.waitingTimes.append([20, 30])  # Kasse
             self.waitingTimes.append([20, 20])  # Bäcker
 
-        self.myEvent = threading.Event
+        self.myEvent = threading.Event()
 
         self.startedAt = time.perf_counter
 
@@ -252,9 +254,6 @@ class KundIn(Thread):
         self.Stationen[0][2].subscribe(
             kd_id, self.Stationen[0][1], self.myEvent).set()
         """ wartende Station wird aktiviert """
-
-        """ nn = self.Stationen[0][2].activateStation
-        nn() """
 
     def is_yielding(self):
         logging.info(
@@ -268,13 +267,16 @@ class KundIn(Thread):
             self.Stationen.pop(0) """
 
         self.myEvent.wait()
+
         logging.info("received SET Event at Kunde %s", self.kd_id)
 
         logging.info("Consumer %s received the package", self.kd_id)
-        self.Stationen.removeAt(0)
+        self.Stationen.pop(0)
 
         if len(self.Stationen) == 0:
             """ FINISHED """
+            logging.info(
+                "KUNDE %d IST FERTIG UND VERLÄSST DEN LADEN", self.kd_id)
             kunden_running_lock.acquire()
             kunden_running.remove(self.kd_id)
             kunden_running_lock.release()
@@ -283,16 +285,22 @@ class KundIn(Thread):
                 [self.kd_id, self.typ, self.startedAt, time.perf_counter, self.skipped])
             kunden_happy_lock.release()
             """ END THREAD """
+            return
 
         """ Subscribe to next after successful """
         nextStation = self.Stationen[0]
-        wayToNextStation = 1
-        time.sleep(wayToNextStation)
+        wayToNextStation = self.waitingTimes.pop(0)[1]
+        logging.info("Kunde %d geht %s lang zu nächster Station (just started)",
+                     self.kd_id, wayToNextStation)
+        time.sleep(wayToNextStation*TIMETRIMFACTOR)
         logging.info(
             "Consumer %s arrived to and waits at %s [WAITLIST: %d]", self.kd_id, nextStation[0], 0)
         """ enter or return len """
+        self.myEvent.clear()
+        nextStation[2].subscribe(
+            self.kd_id, nextStation[1], self.myEvent).set()
 
-        """ nextStation[2].subscribe(self.kd_id, self.myEvent).set() """
+        self.is_yielding()
 
 
 realtime.main()
