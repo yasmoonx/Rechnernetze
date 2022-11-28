@@ -47,23 +47,39 @@ class Thread:
 
 
 class Station(Thread):
+    """ Die Station-Threads werden zu Beginn der 
+        Simulation gestartet und warten, bis Sie von einem KundIn-Thread aufgeweckt werden. """
 
     def newKunde(self, kd_id):
         self.warteListe.append(kd_id)
         return self.myEvent
 
+    """ Die Zeit für die Bedienung einer KundIn wird simuliert,
+    in dem sich der Station-Thread für die Bediendauer schlafen legt. (done)
+    Das wird über die sleep-Funktion aus dem Modul time realisiert.
+    Danach wird die bediente KundIn aufgeweckt. (WANN WURDE DIE ÜBERHAUPT EINGESCHLÄFERT?)
+    Wenn keine weiteren KundInnen in der Warteschlange sind, wartet die Station auf die 
+    Ankunft des nächsten Kunden """
+
     def is_yielding(self):
         while not self.myEvent.is_set():
-            x = 0
+            notAwake = 1
         logging.info("received SET Event at %s", self.name)
+
         currentKD = self.warteListe.pop(0)
         logging.info("servingCustomer(at %s): '%d'",
                      self.name, currentKD)
         time.sleep(self.waitTime)
         logging.info("servedCustomer(at %s): '%d'",
                      self.name, currentKD)
-        """ self.myEvent.isSet = 0 """
-        """ self.is_yielding() """
+
+        if len(self.warteListe) != 0:
+            self.is_yielding()
+        else:
+            self.myEvent.isSet = 0
+            logging.info("(w) - %s is waiting for customers",
+                         self.name)
+            """ self.is_yielding() """
 
     def __init__(self, name):
         logging.info("newStation: '%s' is waiting for customers", name[0])
