@@ -189,7 +189,7 @@ class Customer():
         #not enough space in queue
         else:
             Customer.dropped[station.name]+= 1 #customer left station without buying stuff
-            
+            Customer.complete -= 1
             ev = Ev(EvQueue.time,work=self.leave_station,prio=2)
             evQ.push(ev)
             my_print1(self.name,station.name,'dropped')
@@ -250,11 +250,13 @@ evQ.start()
 my_print('Simulationsende: %is' % EvQueue.time)
 my_print('Anzahl Kunden: %i' % (Customer.count
                                 ))
-my_print('Anzahl vollständige Einkäufe %i' % Customer.complete)
+my_print('Anzahl vollständige Einkäufe: %i' % Customer.complete)
+#x= Customer.duration / Customer.count
 x = EvQueue.time / Customer.count
 my_print(str('Mittlere Einkaufsdauer %.2fs' % x))
 #x = Customer.duration_cond_complete / Customer.complete
-#my_print('Mittlere Einkaufsdauer (vollständig): %.2fs' % x)
+x = EvQueue.time / Customer.complete
+my_print('Mittlere Einkaufsdauer (vollständig): %.2fs' % x)
 S = ('Bäcker', 'Metzger', 'Käse', 'Kasse')
 for s in S:
     x = Customer.dropped[s] / (Customer.served[s] + Customer.dropped[s]) * 100
