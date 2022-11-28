@@ -32,6 +32,12 @@ class realtime:
         k = KundIn(0, 0, Stationen)
         """ create Kunde with walklist 1 (Typ1) """
 
+        stationen_running = list()
+        for s in Stationen:
+            t = threading.Thread(target=s[2].is_yielding())
+            stationen_running.append(t)
+            t.start()
+
 
 class Thread:
     myVar = "text"
@@ -41,28 +47,35 @@ class Thread:
 
 
 class Station(Thread):
-    """ def newStation(name):
-        logging.info("newStation: '%s' is waiting for customers", name[0])
-        time.sleep(name[1]) """
 
     def newKunde(self, kd_id):
-        kd_id = 1
-        self.warteListe = list()
-        """ self.event.set() """
-        logging.info("servingCustomer(at %s): '%d'", self.name, kd_id)
+        self.warteListe.append(kd_id)
+        return self.myEvent
+
+    def is_yielding(self):
+        while not self.myEvent.is_set():
+            x = 0
+        logging.info("received SET Event at %s", self.name)
+        currentKD = self.warteListe.pop(0)
+        logging.info("servingCustomer(at %s): '%d'",
+                     self.name, currentKD)
         time.sleep(self.waitTime)
+        logging.info("servedCustomer(at %s): '%d'",
+                     self.name, currentKD)
+        """ self.myEvent.isSet = 0 """
+        """ self.is_yielding() """
 
     def __init__(self, name):
         logging.info("newStation: '%s' is waiting for customers", name[0])
         self.name = name[0]
         self.waitTime = name[1]
-        """ self.event = threading.Event """
-        """ self.event.wait(self=self) """
+        self.myEvent = threading.Event()
+        self.warteListe = list()
 
 
 class KundIn(Thread):
-    """ Die KundIn-Threads werden zum Beginn des Einkaufs gestartet. Das Einkaufen im Supermarkt zwischen 
-    den Stationen wird simuliert, in dem der Thread schlafen gelegt wird (time.sleep). Wenn eine KundIn 
+    """ Die KundIn-Threads werden zum Beginn des Einkaufs gestartet. Das Einkaufen im Supermarkt zwischen
+    den Stationen wird simuliert, in dem der Thread schlafen gelegt wird (time.sleep). Wenn eine KundIn
     an einer Station eintrifft, wird die KundIn in die Warteschlange eingereiht
     und der wartende Stations-Thread aktiviert """
 
@@ -70,11 +83,7 @@ class KundIn(Thread):
         self.kd_id = 0
         self.myThread = threading.Thread(target=self)
         self.walkList = []
-        """ switch = {
-            0:for s in Stationen:
-                self.walkList.append(s[2].newKunde(kd_id)),
-        }
-        return switch.get(typ, "Invalid") """
+
         if typ == 0:
             for s in Stationen:
                 self.walkList.append(s[2].newKunde(kd_id))
@@ -82,6 +91,8 @@ class KundIn(Thread):
             self.walkList.append(s[0][2].newKunde(kd_id))
         logging.info(
             "Created Customer of Type %d with ID: %d determined to walk: %s", typ, kd_id, self.walkList)
+
+        self.walkList.pop(0).set()
 
     def doSmth(self):
         logging.info("did something")
