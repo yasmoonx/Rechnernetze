@@ -8,13 +8,8 @@ logging.basicConfig(format=format, level=logging.INFO,
                     datefmt="%H:%M:%S")
 
 TIMETRIMFACTOR = 0.01
-STARTTIME = 0
-CREATIONENDTIME = 1800 * TIMETRIMFACTOR
-ENDTIME = 0
-KILLSWITCH = 0
 
-stationen_running = list()
-""" We can check whether kunden_running is 0 along with creationendtime while yielding """
+stationen_running = list()  # unused
 kunden_running = list()
 kunden_running_lock = threading.Lock()
 
@@ -28,25 +23,29 @@ Stationen = [["Eingang", 0 * TIMETRIMFACTOR, 0],
              ["Bäcker", 10 * TIMETRIMFACTOR, 0],
              ["Ausgang", 0 * TIMETRIMFACTOR, 0]]
 
-kundenAnzahl = 0
-
 
 class realtime:
-    def myThread():
-        logging.info("start")
+    kundenAnzahl = 0
+    allDone = 0
+    STARTTIME = 0
+    CREATIONENDTIME = 1800 * TIMETRIMFACTOR
+    ENDTIME = 0
 
-    def finalize(self):
+    def finalize():
         logging.info("Started at %d and ended at %d. Had %d Customers in total.",
-                     STARTTIME, ENDTIME, kundenAnzahl)
+                     realtime.STARTTIME, realtime.ENDTIME, realtime.kundenAnzahl)
+
         kunden_happy_lock.acquire()
 
         totallyHappyCount = 0
         fullBuyDuration = 0
 
+        """ logging.info("list of customer finalization:") """
         for k in kunden_happy:
-            if k[3] == 0:
+            logging.info(k)
+            if k[4] == 0:
                 totallyHappyCount += 1
-                fullBuyDuration += (k[2] - k[1])/TIMETRIMFACTOR
+                fullBuyDuration += (float(k[2]) - float(k[1]))/TIMETRIMFACTOR
         if totallyHappyCount != 0:
             logging.info("Glückliche Kundenanzahl: %d bei einer durchschnittlichen Einkaufszeit von %ds",
                          totallyHappyCount, fullBuyDuration/totallyHappyCount)
@@ -56,48 +55,45 @@ class realtime:
         for s in Stationen:
             logging.info("%s dropped %d percent", s[0], s[2].getDropRate())
 
-    def generateCustomer(self):
-        newK = KundIn(kundenAnzahl, random.choice([1, 2]), Stationen)
+    def generateCustomer():
+        wirdTyp = random.choice([1, 2])
+        newK = KundIn(realtime.kundenAnzahl, wirdTyp, Stationen)
         runK = threading.Thread(target=newK.is_yielding)
-        kunden_running.append(kundenAnzahl)
+        kunden_running.append(realtime.kundenAnzahl)
         """ kunden_running.append([newK, runK]) """
-        kundenAnzahl += 1
+        realtime.kundenAnzahl += 1
         runK.start()
-        time.sleep(random.randrange(
-            1 * TIMETRIMFACTOR, 20 * TIMETRIMFACTOR, 1 * TIMETRIMFACTOR))
-        if time.perf_counter <= CREATIONENDTIME:
-            self.generateCustomer()
+        if wirdTyp == 1:
+            time.sleep(60*TIMETRIMFACTOR)
+        else:
+            time.sleep(200*TIMETRIMFACTOR)
+        if float(time.perf_counter()) < realtime.CREATIONENDTIME:
+            realtime.generateCustomer()
+        else:
+            logging.info("STOPPED GENERATING NEW CUSTOMERS AT %f",
+                         time.perf_counter())
 
     def main():
-        threads = list()
-        for i in range(3):
-            x = threading.Thread(target=realtime.myThread, args=(""))
-            threads.append(x)
-            x.start()
-
         for s in Stationen:
-            """ logging.info(s) """
             s[2] = Station(s)
             """ 0 = name; 1 = waitTime; 2 = Klassenreferenz """
-
-        """ create Kunde with walklist 1 (Typ1) """
 
         for s in Stationen:
             t = threading.Thread(target=s[2].is_yielding)
             stationen_running.append(t)
             t.start()
 
-        k = KundIn(0, 2, Stationen)
+        """ create Kunde with walklist 1 (Typ1) """
+        """ k = KundIn(0, 1, Stationen)
         kunden_running.append(0)
 
         kT = threading.Thread(target=k.is_yielding)
-        kT.start()
+        kT.start() """
 
-        """ STARTTIME = time.perf_counter()
-        logging.info("Starttime: %d", STARTTIME)
-        CREATIONENDTIME += STARTTIME
-        creator = threading.Thread(target=realtime.generateCustomer, args=(""))
-        creator.start() """
+        realtime.STARTTIME = time.perf_counter()
+        realtime.CREATIONENDTIME += realtime.STARTTIME
+        creator = threading.Thread(target=realtime.generateCustomer)
+        creator.start()
 
 
 class Thread:
@@ -115,6 +111,9 @@ class Station(Thread):
     """ Die Station-Threads werden zu Beginn der
         Simulation gestartet und warten, bis Sie von einem KundIn-Thread aufgeweckt werden. """
 
+    def getLen(self):  # noLock for this operation
+        return len(self.warteListe)
+
     def activateStation(self):
         return self.myEvent
 
@@ -131,7 +130,6 @@ class Station(Thread):
                      kd_id, items, self.name)
         warteListeLock.acquire()
         self.warteListe.append({kd_id: [items, aufgehalteneHand]})
-        """ {kd_id: aufgehaltene Hand} for dict """
         self.interested += 1
         warteListeLock.release()
         return self.myEvent
@@ -143,21 +141,22 @@ class Station(Thread):
         self.dropped += 1
         self.warteListe.remove(kd_id)
         warteListeLock.release()
-    """ We could count in here the Skips to but would have to make sure unsubscribe is only called when too long waited """
 
     """ Die Zeit für die Bedienung einer KundIn wird simuliert,
     in dem sich der Station-Thread für die Bediendauer schlafen legt. (done)
     Das wird über die sleep-Funktion aus dem Modul time realisiert.
-    Danach wird die bediente KundIn aufgeweckt. (WANN WURDE DIE ÜBERHAUPT EINGESCHLÄFERT?)
+    Danach wird die bediente KundIn aufgeweckt.
     Wenn keine weiteren KundInnen in der Warteschlange sind, wartet die Station auf die
     Ankunft des nächsten Kunden """
 
     def is_yielding(self):
-        """ while not self.myEvent.is_set():
-            notAwake = 1 """
 
         logging.info("'%s' is waiting for customers", self.name)
-        self.myEvent.wait()
+        """ self.myEvent.wait() """
+        while not self.myEvent.is_set():
+            if realtime.allDone == 1:
+                logging.info("Station %s is shutting down.", self.name)
+                return
         logging.info("received SET Event at %s", self.name)
 
         warteListeLock.acquire()
@@ -169,6 +168,7 @@ class Station(Thread):
         currentKDEvent = currentKD[1]
         logging.info("servingCustomer(at %s): '%d'",
                      self.name, kd_name)
+        # TIMETRIM already in waitTime
         time.sleep(self.waitTime * currentKDItems)
         logging.info("servedCustomer(at %s): '%d'",
                      self.name, kd_name)
@@ -178,7 +178,6 @@ class Station(Thread):
         if len(self.warteListe) != 0:
             self.is_yielding()
         else:
-            """ self.myEvent.isSet = False """
             self.myEvent.clear()
             """ logging.info("(just served) - %s will be waiting for customers",
                          self.name) """
@@ -212,11 +211,11 @@ class KundIn(Thread):
             self.Stationen.pop(0)
             self.Stationen.pop(4)
 
-        """ full """
         """ ["Wurst", 30 * TIMETRIMFACTOR, 0],
              ["Käse", 60 * TIMETRIMFACTOR, 0],
              ["Kasse", 5 * TIMETRIMFACTOR, 0],
              ["Bäcker", 10 * TIMETRIMFACTOR, 0], """
+        """ full """
         if typ == 1:
             baecker = self.Stationen.pop(3)
             baecker[1] = 10
@@ -245,7 +244,7 @@ class KundIn(Thread):
 
         self.myEvent = threading.Event()
 
-        self.startedAt = time.perf_counter
+        self.startedAt = time.perf_counter()
 
         logging.info(
             "Kunde %d betritt den Laden und läuft zu erster Station", kd_id)
@@ -258,17 +257,14 @@ class KundIn(Thread):
     def is_yielding(self):
         logging.info(
             "Kundenthread zu %d started and waits to receive package", self.kd_id)
+
         """ while not self.myEvent.is_set():
             notAwake = 1 """
         """ Better not Waiting but checking whether to leave the current location """
-        """ if true:
-            self.Stationen[0][2].unSubscribe(self.kd_id)
-            self.skipped += 1
-            self.Stationen.pop(0) """
 
         self.myEvent.wait()
 
-        logging.info("received SET Event at Kunde %s", self.kd_id)
+        """ logging.info("received SET Event at Kunde %s", self.kd_id) """
 
         logging.info("Consumer %s received the package", self.kd_id)
         self.Stationen.pop(0)
@@ -276,14 +272,19 @@ class KundIn(Thread):
         if len(self.Stationen) == 0:
             """ FINISHED """
             logging.info(
-                "KUNDE %d IST FERTIG UND VERLÄSST DEN LADEN", self.kd_id)
+                "KUNDE %d VON TYP %d IST FERTIG UND VERLÄSST DEN LADEN", self.kd_id, self.typ)
             kunden_running_lock.acquire()
             kunden_running.remove(self.kd_id)
+            if len(kunden_running) == 0:
+                realtime.allDone = 1
+                realtime.ENDTIME = time.perf_counter()
             kunden_running_lock.release()
             kunden_happy_lock.acquire()
             kunden_happy.append(
-                [self.kd_id, self.typ, self.startedAt, time.perf_counter, self.skipped])
+                [self.kd_id, self.typ, self.startedAt, time.perf_counter(), self.skipped])
             kunden_happy_lock.release()
+            if realtime.allDone == 1:
+                realtime.finalize()
             """ END THREAD """
             return
 
@@ -294,11 +295,18 @@ class KundIn(Thread):
                      self.kd_id, wayToNextStation)
         time.sleep(wayToNextStation*TIMETRIMFACTOR)
         logging.info(
-            "Consumer %s arrived to and waits at %s [WAITLIST: %d]", self.kd_id, nextStation[0], 0)
-        """ enter or return len """
+            "Consumer %s arrived to and waits at %s [LEN(WAITLIST) at arrival: %d]", self.kd_id, nextStation[0], nextStation[2].getLen())
+
         self.myEvent.clear()
+
         nextStation[2].subscribe(
             self.kd_id, nextStation[1], self.myEvent).set()
+
+        if nextStation[2].getLen() > 7:
+            self.Stationen[0][2].unSubscribe(self.kd_id)
+            self.skipped += 1
+            self.Stationen.pop(0)
+            self.waitingTimes.pop(0)
 
         self.is_yielding()
 
