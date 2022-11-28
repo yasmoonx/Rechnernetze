@@ -110,22 +110,38 @@ class Station():
     def queue(self,customer):
         #customer stands in queue
         self.buffer.append(customer)
+        
 
-        if self.busy == False: #if station not busy
-            self.busy = True
-            T,station,N,W = customer.list[0]
-            ev = Ev(EvQueue.time + (N*self.delay_per_item), work=self.done,args=customer,prio=2)
+        if self.busy == False:      #if station not busy
+            self.busy = True        #set to busy
+            T,station,N,W = customer.list[0] #list from first customer in queue
+            ev = Ev(EvQueue.time + (N*self.delay_per_item), work=self.done,args=customer,prio=1)
             evQ.push(ev)
             my_print2(self.name,'serves',customer.name)
+            
 
 
     def done(self,customer):
-        Customer.served[self.name]+=1 #customer was served at station
-        #customer leaves station
         my_print1(customer.name,self.name,'leaves')
-        self.busy= False
-        ev = Ev(EvQueue.time, work=customer.leave_station,prio=2)
+        Customer.served[self.name]+=1   #customer was served at station
+        #customer leaves station
+        ev = Ev(EvQueue.time, work=customer.leave_station,prio=2)   #create leave station event
         evQ.push(ev)
+        self.buffer.remove(customer)    #remove customer from queue
+        
+
+        if len(self.buffer)>0: #if more people in queue
+            self.busy = True     
+            next = self.buffer[0]
+            T,station,N,W = next.list[0] #next customer in queue
+            event = Ev(EvQueue.time+ (N*self.delay_per_item), work=self.done,args=next,prio=1)
+            evQ.push(event)
+        else:
+            self.busy= False
+       
+            
+
+        
         
              
 
@@ -164,19 +180,22 @@ class Customer():
         # T= Zeit bis naechste station,, N = anzahl einkaeufe, W = maximale warteschlange
         T,station,N,W = self.list[0]
         my_print1(self.name,station.name,'arrives')
-        Customer.duration += station.delay_per_item * N
+        
         #check for enough space in queue
-        if len(station.buffer)+1 <= W:
-            Customer.duration_cond_complete+= station.delay_per_item *N
+        if len(station.buffer) < W:
+
             ev = Ev(EvQueue.time,work=station.queue, args=self,prio=1)
             evQ.push(ev)
         #not enough space in queue
         else:
             Customer.dropped[station.name]+= 1 #customer left station without buying stuff
+            
+            ev = Ev(EvQueue.time,work=self.leave_station,prio=2)
+            evQ.push(ev)
             my_print1(self.name,station.name,'dropped')
 
 
-
+    #leave station
     def leave_station(self,args):
         #delete entry in einkaufsliste
         self.list.pop(0)
@@ -232,10 +251,10 @@ my_print('Simulationsende: %is' % EvQueue.time)
 my_print('Anzahl Kunden: %i' % (Customer.count
                                 ))
 my_print('Anzahl vollständige Einkäufe %i' % Customer.complete)
-x = Customer.duration / Customer.count
+x = EvQueue.time / Customer.count
 my_print(str('Mittlere Einkaufsdauer %.2fs' % x))
-x = Customer.duration_cond_complete / Customer.complete
-my_print('Mittlere Einkaufsdauer (vollständig): %.2fs' % x)
+#x = Customer.duration_cond_complete / Customer.complete
+#my_print('Mittlere Einkaufsdauer (vollständig): %.2fs' % x)
 S = ('Bäcker', 'Metzger', 'Käse', 'Kasse')
 for s in S:
     x = Customer.dropped[s] / (Customer.served[s] + Customer.dropped[s]) * 100

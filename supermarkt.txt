@@ -1,9 +1,8 @@
-Simulationsende: 1810s
+Simulationsende: 2956s
 Anzahl Kunden: 40
-Anzahl vollständige Einkäufe 7
-Mittlere Einkaufsdauer 138.25s
-Mittlere Einkaufsdauer (vollständig): 510.00s
-Drop percentage at Bäcker: 33.33
-Drop percentage at Metzger: 74.29
+Anzahl vollständige Einkäufe 40
+Mittlere Einkaufsdauer 73.90s
+Drop percentage at Bäcker: 0.00
+Drop percentage at Metzger: 35.00
 Drop percentage at Käse: 0.00
 Drop percentage at Kasse: 0.00
