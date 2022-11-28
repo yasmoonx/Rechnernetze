@@ -9,7 +9,7 @@ logging.basicConfig(format=format, level=logging.INFO,
 
 TIMETRIMFACTOR = 0.01
 STARTTIME = 0
-CREATIONENDTIME = 1800
+CREATIONENDTIME = 1800 * TIMETRIMFACTOR
 ENDTIME = 0
 KILLSWITCH = 0
 
@@ -21,12 +21,12 @@ kunden_running_lock = threading.Lock()
 kunden_happy = list()
 kunden_happy_lock = threading.Lock()
 
-Stationen = [["Eingang", 0, 0],
-             ["Wurst", 30, 0],
-             ["Käse", 60, 0],
-             ["Kasse", 5, 0],
-             ["Bäcker", 10, 0],
-             ["Ausgang", 0, 0]]
+Stationen = [["Eingang", 0 * TIMETRIMFACTOR, 0],
+             ["Wurst", 30 * TIMETRIMFACTOR, 0],
+             ["Käse", 60 * TIMETRIMFACTOR, 0],
+             ["Kasse", 5 * TIMETRIMFACTOR, 0],
+             ["Bäcker", 10 * TIMETRIMFACTOR, 0],
+             ["Ausgang", 0 * TIMETRIMFACTOR, 0]]
 
 kundenAnzahl = 0
 
@@ -63,7 +63,8 @@ class realtime:
         """ kunden_running.append([newK, runK]) """
         kundenAnzahl += 1
         runK.start()
-        time.sleep(random.randrange(1, 20, 1))
+        time.sleep(random.randrange(
+            1 * TIMETRIMFACTOR, 20 * TIMETRIMFACTOR, 1 * TIMETRIMFACTOR))
         if time.perf_counter <= CREATIONENDTIME:
             self.generateCustomer()
 
@@ -166,7 +167,7 @@ class Station(Thread):
         if len(self.warteListe) != 0:
             self.is_yielding()
         else:
-            self.myEvent.isSet = 0
+            """ self.myEvent.isSet = False """
             self.myEvent.clear()
             logging.info("(w) - %s is waiting for customers",
                          self.name)
@@ -192,11 +193,31 @@ class KundIn(Thread):
         self.kd_id = kd_id
         self.typ = typ
         self.skipped = 0
-        self.startedAt = time.perf_counter
+        self.waitingTimes = list()
 
         self.Stationen = Stationen.copy()
+
+        if typ != 0:
+            self.Stationen.pop(0)
+            self.Stationen.pop(5)
+
+        """ full """
+        if typ == 1:
+            """ maximale WaitTime, Time to next Station """
+            self.waitingTimes.append([10, 10])  # Bäcker
+            self.waitingTimes.append([10, 30])  # Wurst
+            self.waitingTimes.append([5, 45])  # Käse
+            self.waitingTimes.append([20, 60])  # Kasse
+        """ leberkäs """
+        if typ == 2:
+            self.Stationen.pop(1)
+            self.waitingTimes.append([5, 30])  # Wurst
+            self.waitingTimes.append([20, 30])  # Kasse
+            self.waitingTimes.append([20, 20])  # Bäcker
+
         self.myEvent = threading.Event
 
+        self.startedAt = time.perf_counter
         self.Stationen[0][2].subscribe(kd_id, self.myEvent).set()
         """ wartende Station wird aktiviert """
 
@@ -232,14 +253,14 @@ class KundIn(Thread):
             """ END THREAD """
 
         """ Subscribe to next after successful """
-        nextStation = Stationen[0]
+        nextStation = self.Stationen[0]
         wayToNextStation = 1
         time.sleep(wayToNextStation)
         logging.info(
             "Consumer %s arrived to and waits at %s [WAITLIST: %d]", self.kd_id, nextStation[0], 0)
         """ enter or return len """
 
-        nextStation[1].set()
+        nextStation[2].subscribe(self.kd_id, self.myEvent).set()
 
 
 realtime.main()
