@@ -1,0 +1,1 @@
+for /l %%a IN (0,1000,20000) DO (ping -l %%a -n 5 www.fu-berlin.de | findstr Mittelwert >> berlin-pakete.txt)
