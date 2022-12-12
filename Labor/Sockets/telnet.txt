@@ -1,0 +1,18 @@
+Ueben8fuer8RN
+
+telnet asmtp.htwg-konstanz.de 587
+EHLO example.net
+AUTH LOGIN
+cm5ldGlu
+VWViZW44ZnVlcjhSTg==
+MAIL FROM:<chris.jakob@htwg-konstanz.de>
+RCPT TO:<chris.jakob@htwg-konstanz.de>
+DATA
+
+From:<BliBlupp@nix.de>
+To:<irgendwen@imNirgendwo.de>
+Subject: Hey Phishi!
+
+BliBlupp
+.
+QUIT
