@@ -30,7 +30,34 @@ def calculate(operation,numbers):
                 max = n    
         result= max
     return result
+
+def getAnswer(data):
+    copyData = data
+    ID = struct.unpack('I',copyData[:4])[0]
+    copyData = copyData[4:]             #slice off id
+    op = copyData[:5].decode()
+    if op!='Summe':   
+                              #5 bytes for SUMME
+        op = copyData[:7].decode() 
+        print(op)              #7 bytes for PRODUKT, MAXIMUM, MINIMUM
+        copyData= copyData[7:]          #slice off operation
+    else:
+        copyData = copyData[5:]         #slice off operation
+
+    amount = struct.unpack('B',copyData[:1])[0]
+    copyData = copyData[1:]             #slice off N
+    numbers= []
+    for i in range(amount):
+        n = struct.unpack('i', copyData[:4])[0]
+        numbers.append(n)
+        copyData = copyData[4:]         #slice off number
+
+
         
+    solution = calculate(op,numbers)
+    answer = struct.pack('Ii', ID, solution)
+    return answer
+
 
 #echo_server:tcp
 
@@ -62,31 +89,9 @@ while time.time()<t_end:
         print('received message: ', data, 'from ', addr)
 
         #attention: unpack is a tuple(data,)
-        copyData = data
-        ID = struct.unpack('I',copyData[:4])[0]
-        copyData = copyData[4:]             #slice off id
-        op = copyData[:5].decode()
-        if op!='Summe':   
-                              #5 bytes for SUMME
-            op = copyData[:7].decode() 
-            print(op)              #7 bytes for PRODUKT, MAXIMUM, MINIMUM
-            copyData= copyData[7:]          #slice off operation
-        else:
-            copyData = copyData[5:]         #slice off operation
-        amount = struct.unpack('B',copyData[:1])[0]
-        copyData = copyData[1:]             #slice off N
-        numbers= []
-        for i in range(amount):
-            n = struct.unpack('i', copyData[:4])[0]
-            numbers.append(n)
-            copyData = copyData[4:]         #slice off number
-
-
         
-        solution = calculate(op,numbers)
-        answer = struct.pack('Ii', ID, solution)
 
-        conn.send(answer)
+        conn.send(getAnswer(data))
         #conn.send(data[::-1])
         
     except socket.timeout:
@@ -107,8 +112,9 @@ t_end = time.time()+server_activity_period  # Ende der Aktivitätsperiode
 while time.time() < t_end:
     try:
         data, addr = sock_udp.recvfrom(1024)
-        print('received message: '+data.decode('utf-8')+' from ', addr)
-        sock_udp.sendto(data[::-1], addr)
+        print('received message: ',data,' from ', addr)
+        #sock_udp.sendto(data[::-1], addr)
+        sock_udp.sendto(getAnswer(data),addr)
     except socket.timeout:
         print('Socket timed out at', time.asctime())
 
