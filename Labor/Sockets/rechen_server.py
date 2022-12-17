@@ -1,5 +1,6 @@
 import socket
 import time
+import struct
 
 
 My_IP = "127.0.0.1"
@@ -13,6 +14,7 @@ def calculate(operation,numbers):
         for n in numbers:
             result += n
     elif(operation=='Produkt'):
+        result =1
         for n in numbers:
             result *= n
     elif(operation == 'Minimum'):
@@ -21,7 +23,7 @@ def calculate(operation,numbers):
             if(n < min):
                 min = n
         result = min
-    elif(operation == 'Maxmimum'):
+    elif(operation == 'Maximum'):
         max = 0
         for n in numbers:
             if(n > max):
@@ -30,26 +32,8 @@ def calculate(operation,numbers):
     return result
         
 
-
-#echo_server:udp
-sock_udp = socket.socket(socket.AF_INET,
-                     socket.SOCK_DGRAM)
-sock_udp.bind((My_IP, My_PORT_UDP))
-
-sock_udp.settimeout(10)
-t_end = time.time()+server_activity_period  # Ende der Aktivitätsperiode
-
-while time.time() < t_end:
-    try:
-        data, addr = sock_udp.recvfrom(1024)
-        print('received message: '+data.decode('utf-8')+' from ', addr)
-        sock_udp.sendto(data[::-1], addr)
-    except socket.timeout:
-        print('Socket timed out at', time.asctime())
-
-sock_udp.close()
-
 #echo_server:tcp
+
 sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)            # (IPV4 adresse, )
 sock_tcp.bind((My_IP, My_PORT_TCP))                                         # (Darf kontaktieren, schreibt darauf)
 print('Listening on Port ',My_PORT_TCP, ' for incoming TCP connections')
@@ -75,11 +59,58 @@ while time.time()<t_end:
             print('Closing ...')
             conn.close()
             break
-        print('received message: ', data.decode('utf-8'), 'from ', addr)
-        conn.send(data[::-1])
+        print('received message: ', data, 'from ', addr)
+
+        #attention: unpack is a tuple(data,)
+        copyData = data
+        ID = struct.unpack('I',copyData[:4])[0]
+        copyData = copyData[4:]             #slice off id
+        op = copyData[:5].decode()
+        if op!='Summe':   
+                              #5 bytes for SUMME
+            op = copyData[:7].decode() 
+            print(op)              #7 bytes for PRODUKT, MAXIMUM, MINIMUM
+            copyData= copyData[7:]          #slice off operation
+        else:
+            copyData = copyData[5:]         #slice off operation
+        amount = struct.unpack('B',copyData[:1])[0]
+        copyData = copyData[1:]             #slice off N
+        numbers= []
+        for i in range(amount):
+            n = struct.unpack('i', copyData[:4])[0]
+            numbers.append(n)
+            copyData = copyData[4:]         #slice off number
+
+
+        
+        solution = calculate(op,numbers)
+        answer = struct.pack('Ii', ID, solution)
+
+        conn.send(answer)
+        #conn.send(data[::-1])
+        
     except socket.timeout:
         print('Socket timed out at',time.asctime())
 
 sock_tcp.close()
 if conn:
     conn.close()
+
+#echo_server:udp
+sock_udp = socket.socket(socket.AF_INET,
+                     socket.SOCK_DGRAM)
+sock_udp.bind((My_IP, My_PORT_UDP))
+
+sock_udp.settimeout(10)
+t_end = time.time()+server_activity_period  # Ende der Aktivitätsperiode
+
+while time.time() < t_end:
+    try:
+        data, addr = sock_udp.recvfrom(1024)
+        print('received message: '+data.decode('utf-8')+' from ', addr)
+        sock_udp.sendto(data[::-1], addr)
+    except socket.timeout:
+        print('Socket timed out at', time.asctime())
+
+sock_udp.close()
+
