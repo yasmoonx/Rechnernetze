@@ -8,9 +8,14 @@ counter = 0
 
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
 sock.settimeout(10)
 print('Connecting to TCP server with IP ', Server_IP, ' on Port ', Server_PORT)
+#sock.bind((Server_IP, 52000)) wenn man port festlegen will
 sock.connect((Server_IP, Server_PORT))
+ip,port = sock.getsockname()
+print("IP und Port: ", ip,' ',port)
+
 
 
 def buildmsg():
