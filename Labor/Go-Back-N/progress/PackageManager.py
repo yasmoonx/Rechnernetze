@@ -1,17 +1,14 @@
 import logging
 from math import ceil
-""" import struct """
-
 
 segmentSize = 20
 format = "%(asctime)s: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO,
                     datefmt="%H:%M:%S")
 
-newPackageCounter = 0
-
 
 class PackageManager:
+    newPackageCounter = 0
 
     def unpackData(package):
         headerNum = int.from_bytes(package[0:2], "big", signed=False)
@@ -19,8 +16,10 @@ class PackageManager:
 
     def packData(headerNum: int, content: bytes):
         allPackages = list()
+        if headerNum == -1:
+            headerNum = PackageManager.newPackageCounter
+            PackageManager.newPackageCounter += 1
 
-        """ struct.pack() """
         headerBytes = headerNum.to_bytes(2, "big", signed=False)
         headerSize = len(headerBytes)
         newEntry = 0
@@ -49,12 +48,13 @@ class PackageManager:
                 allPackages.append(newEntry)
                 i = i+1
 
-        logging.info(allPackages)
+        logging.info("PM created until %d", PackageManager.newPackageCounter)
         return allPackages
 
-    def createMessage():
+    """ def createMessage():
         PackageManager.packData(
-            headerNum=newPackageCounter, content=b'Dies ist ein ewig langer Text den man per UDP uebertragen muss aber sicherstellen soll, dass alles und alles in der richtigen Reihenfolge ankommt!')
+            headerNum=PackageManager.newPackageCounter, content=b'Dies ist ein ewig langer Text den man per UDP uebertragen muss aber sicherstellen soll, dass alles und alles in der richtigen Reihenfolge ankommt!')
+ """
 
 
 """ 
