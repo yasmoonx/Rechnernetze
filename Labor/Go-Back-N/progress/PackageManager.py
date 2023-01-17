@@ -1,21 +1,21 @@
 import logging
 from math import ceil
-
 """ import struct """
+
 
 segmentSize = 20
 format = "%(asctime)s: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO,
                     datefmt="%H:%M:%S")
 
-newPackageCounter = -1
+newPackageCounter = 0
 
 
 class PackageManager:
 
     def unpackData(package):
-        headerNum = int.from_bytes(package[0:4], "big", signed=False)
-        return [headerNum, package[4:]]
+        headerNum = int.from_bytes(package[0:2], "big", signed=False)
+        return [headerNum, package[2:]]
 
     def packData(headerNum: int, content: bytes):
         allPackages = list()
@@ -30,13 +30,15 @@ class PackageManager:
         else:
             limit = ceil((headerSize + len(content)) /
                          (segmentSize - headerSize))
-            for i in range(headerNum, limit):
+            """ for i in range(headerNum, limit): """
+            i = headerNum
+            while i < limit:
                 currentHeader = i.to_bytes(2, "big", signed=False)
 
                 # Header needs more Bytes?
                 if headerSize != len(currentHeader):
                     headerSize = len(currentHeader)
-                    newLimit = ceil(
+                    limit = ceil(
                         (headerSize + len(content)) / segmentSize)
                     logging.info("limit adjusted - untested")
 
@@ -45,21 +47,15 @@ class PackageManager:
                     content[maxContentSegSize *
                             (i-headerNum):maxContentSegSize*((i-headerNum)+1)]
                 allPackages.append(newEntry)
+                i = i+1
 
         logging.info(allPackages)
         return allPackages
 
-    def test():
-        logging.info("FUCK YOU PUTIN")
-
     def createMessage():
-        newPackageCounter = 0
-        rt = PackageManager.packData(
+        PackageManager.packData(
             headerNum=newPackageCounter, content=b'Dies ist ein ewig langer Text den man per UDP uebertragen muss aber sicherstellen soll, dass alles und alles in der richtigen Reihenfolge ankommt!')
-        """ GoBackNSocket.injectThisAbfuck(rt) """
-
-    def main():
-        logging.info("FUCK YOU PYTHON")
 
 
-PackageManager.createMessage()
+""" 
+PackageManager.createMessage() """

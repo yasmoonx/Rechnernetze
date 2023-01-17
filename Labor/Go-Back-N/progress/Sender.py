@@ -1,3 +1,5 @@
+from GoBackN import sentPackageQueue
+
 
 class Sender:
 
