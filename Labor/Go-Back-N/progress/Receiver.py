@@ -35,11 +35,17 @@ class Receiver():
 
     def printFull():
         print("Final Message Transfer: %s", Receiver.fullContent)
+        Receiver.sock.stop()
 
     def addSegment(package: bytes):
         content = pm.unpackData(package)[1]
-        Receiver.lastPackageNumReceived = pm.unpackData(package)[0]
-        Receiver.fullContent += content.decode("utf-8")
+        pckNum = pm.unpackData(package)[0]
+        if (pckNum == Receiver.lastPackageNumReceived + 1):
+            Receiver.lastPackageNumReceived = pckNum
+            Receiver.fullContent += content.decode("utf-8")
+        Receiver.sendACK()
+
+    def sendACK():
         AckPck = pm.packData(-1, b'ACK' +
                              Receiver.lastPackageNumReceived.to_bytes(1, 'big', signed=False))
         if len(AckPck) > 1:

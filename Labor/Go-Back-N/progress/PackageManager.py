@@ -1,4 +1,5 @@
 import logging
+from threading import Lock
 from math import ceil
 
 segmentSize = 20
@@ -8,7 +9,8 @@ logging.basicConfig(format=format, level=logging.INFO,
 
 
 class PackageManager:
-    newPackageCounter = 0
+    newPackageCounter: int = 0
+    mutexPC = Lock()
 
     def unpackData(package):
         headerNum = int.from_bytes(package[0:2], "big", signed=False)
@@ -17,8 +19,10 @@ class PackageManager:
     def packData(headerNum: int, content: bytes):
         allPackages = list()
         if headerNum == -1:
+            PackageManager.mutexPC.acquire()
             headerNum = PackageManager.newPackageCounter
             PackageManager.newPackageCounter += 1
+            PackageManager.mutexPC.release()
 
         headerBytes = headerNum.to_bytes(2, "big", signed=False)
         headerSize = len(headerBytes)
@@ -48,7 +52,7 @@ class PackageManager:
                 allPackages.append(newEntry)
                 i = i+1
 
-        logging.info("PM created until %d", PackageManager.newPackageCounter)
+        """ logging.info("PM created until %d", PackageManager.newPackageCounter) """
         return allPackages
 
     """ def createMessage():

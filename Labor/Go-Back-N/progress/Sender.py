@@ -1,5 +1,6 @@
 """ from GoBackN import Sender.sentPackageQueue """
 import logging
+from threading import Lock
 from lossy_udp_socket import lossy_udp_socket
 from PackageManager import PackageManager as pm
 
@@ -23,36 +24,40 @@ class ConnHandler():
 class Sender():
     sentPackageQueue = list()
     allPackages = list()
+    sock = 0
+    mutexList = Lock()
 
     def __init__(self) -> None:
-        self.sock = lossy_udp_socket(
+        Sender.sock = lossy_udp_socket(
             ConnHandler, 50001, 50000, 0)
-        Sender.buildQueue(self)
+        Sender.buildQueue()
 
-    def buildQueue(self):
-        allPackages = pm.packData(
+    def buildQueue():
+        Sender.allPackages = pm.packData(
             headerNum=-1, content=b'Dies ist ein ewig langer Text den man per UDP uebertragen muss aber sicherstellen soll, dass alles und alles in der richtigen Reihenfolge ankommt!')
-        allPackages.append(pm.packData(-1, b'FIN'))
-        logging.info(allPackages)
+        # Warum auch immer springt dieser Aufruf zwischen den oberen und erfordert manuelle PackageNummer
+        Sender.allPackages.append(pm.packData(25, b'FIN')[0])
+        logging.info(Sender.allPackages)
         # push for maximum window size
-        for n in allPackages:
-            Sender.addPackageToQueue(self, n)
+        for n in Sender.allPackages:
+            Sender.addPackageToQueue(n, True)
 
-    def addPackageToQueue(self, newPackage):
+    def addPackageToQueue(newPackage, supressWarning):
         if len(Sender.sentPackageQueue) < 6:
             Sender.sentPackageQueue.append(newPackage)
             # initiate send process
-            logging.info("Sending now: %s", newPackage)
-            self.sock.send(newPackage)
-        else:
+
+            Sender.sock.send(newPackage)
+        elif (supressWarning == False):
             logging.info("MaxWindowSize reached")
 
     def resendQueue(fromIndex):
         Sender.sentPackageQueue = list()
         for i in range(fromIndex, fromIndex + 5):
-            Sender.addPackageToQueue(Sender.allPackages[i])
+            Sender.addPackageToQueue(Sender.allPackages[i], False)
 
     def registerAck(msg):
+        Sender.mutexList.acquire()
         expectedNum = pm.unpackData(Sender.sentPackageQueue[0])[0]
         packageNumReceived = msg
         if (expectedNum != packageNumReceived):
@@ -63,8 +68,12 @@ class Sender():
             Sender.resendQueue(expectedNum)
         else:
             Sender.sentPackageQueue.pop(0)
+            Sender.mutexList.release()
             nextPckNum = expectedNum+4
             if nextPckNum < len(Sender.allPackages):
-                logging.info("ACK started send of %s",
-                             Sender.allPackages[nextPckNum])
-                Sender.addPackageToQueue(Sender.allPackages[nextPckNum])
+                print("ACK started send of ",
+                      Sender.allPackages[nextPckNum])
+                Sender.addPackageToQueue(
+                    newPackage=Sender.allPackages[nextPckNum], supressWarning=False)
+            else:
+                Sender.sock.stop()

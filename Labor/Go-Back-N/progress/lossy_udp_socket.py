@@ -25,12 +25,14 @@ class lossy_udp_socket():
     # interface for sending packets
     def send(self, packet):
         """ print('Sending packet with length: '+str(len(packet))) """
+        print("Sending now: ", packet)
         self.sock.sendto(packet, self.addr)
 
     #t1: msg = recv(bytecount)
     # interface for ending socket
     def stop(self):
         self.STOP = True
+        print("shutting down Thread")
 
     # continuously listening for incoming packets
     # filters packets for remote address
