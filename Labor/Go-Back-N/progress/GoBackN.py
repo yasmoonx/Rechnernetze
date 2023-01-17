@@ -1,6 +1,6 @@
 import logging
 import lossy_udp_socket
-import PackageManager as pm
+from PackageManager import PackageManager as pm
 
 
 format = "%(asctime)s: %(message)s"
@@ -45,7 +45,7 @@ class GoBackN:
             GoBackN.addPackageToQueue(n)
 
     def addPackageToQueue(newPackage):
-        if len(sentPackageQueue < 5):
+        if len(sentPackageQueue) < 5:
             sentPackageQueue.append(newPackage)
             # initiate send process
 
